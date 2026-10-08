@@ -1,0 +1,9 @@
+import { z } from 'zod'
+import { prisma } from '@/lib/server/prisma'
+import { body,fail,ok } from '@/lib/server/http'
+import { withUser } from '@/lib/server/route'
+const s=z.object({name:z.string().min(1).max(120).optional(),targetAmount:z.coerce.number().positive().optional(),currentAmount:z.coerce.number().min(0).optional(),targetDate:z.coerce.date().optional(),monthlyContribution:z.coerce.number().min(0).optional(),category:z.string().max(80).nullable().optional()})
+const enrich=(g:any)=>({...g,percentageComplete:Number(g.targetAmount)?Math.min(100,Number(g.currentAmount)/Number(g.targetAmount)*100):0,remainingAmount:Math.max(0,Number(g.targetAmount)-Number(g.currentAmount))})
+export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){return withUser(async u=>{const {id}=await params;const g=await prisma.goal.findFirst({where:{id,userId:u.id}});return g?ok(enrich(g)):fail('Goal not found','GOAL_NOT_FOUND',404)})}
+export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){return withUser(async u=>{const {id}=await params;const g=await prisma.goal.findFirst({where:{id,userId:u.id}});if(!g)return fail('Goal not found','GOAL_NOT_FOUND',404);const p=s.safeParse(await body(req));if(!p.success)return fail('Invalid goal','VALIDATION_ERROR',422);return ok(enrich(await prisma.goal.update({where:{id},data:p.data})))})}
+export async function DELETE(_:Request,{params}:{params:Promise<{id:string}>}){return withUser(async u=>{const {id}=await params;const g=await prisma.goal.findFirst({where:{id,userId:u.id}});if(!g)return fail('Goal not found','GOAL_NOT_FOUND',404);await prisma.goal.delete({where:{id}});return ok({deleted:true})})}

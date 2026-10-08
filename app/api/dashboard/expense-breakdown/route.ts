@@ -1,0 +1,4 @@
+import { prisma } from '@/lib/server/prisma'
+import { ok } from '@/lib/server/http'
+import { withUser } from '@/lib/server/route'
+export async function GET(){return withUser(async u=>{const rows=await prisma.transaction.findMany({where:{userId:u.id,type:'EXPENSE'},select:{category:true,amount:true}});const m=new Map<string,number>();for(const r of rows)m.set(r.category,(m.get(r.category)||0)+Number(r.amount));const total=[...m.values()].reduce((a,b)=>a+b,0);return ok([...m.entries()].map(([category,amount])=>({category,amount,percentage:total?amount/total*100:0})).sort((a,b)=>b.amount-a.amount))})}

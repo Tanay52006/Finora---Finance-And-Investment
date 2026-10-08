@@ -1,0 +1,8 @@
+import { z } from 'zod'
+import { prisma } from '@/lib/server/prisma'
+import { body,fail,ok } from '@/lib/server/http'
+import { withUser } from '@/lib/server/route'
+const s=z.object({category:z.string().min(1).max(80),limit:z.coerce.number().positive(),month:z.coerce.number().int().min(1).max(12),year:z.coerce.number().int().min(2020).max(2100)})
+async function enrich(userId:string,b:any){const spent=await prisma.transaction.aggregate({where:{userId,type:'EXPENSE',category:b.category,date:{gte:new Date(b.year,b.month-1,1),lt:new Date(b.year,b.month,1)}},_sum:{amount:true}});const x=Number(spent._sum.amount||0),lim=Number(b.limit),pct=lim?x/lim*100:0;return {...b,spent:x,remaining:Math.max(0,lim-x),percentageUsed:pct,status:pct>=100?'OVER_BUDGET':pct>=80?'NEAR_LIMIT':'ON_TRACK'}}
+export async function GET(){return withUser(async u=>{const rows=await prisma.budget.findMany({where:{userId:u.id},orderBy:[{year:'desc'},{month:'desc'}]});return ok(await Promise.all(rows.map(x=>enrich(u.id,x))) )})}
+export async function POST(req:Request){return withUser(async u=>{const p=s.safeParse(await body(req));if(!p.success)return fail('Invalid budget','VALIDATION_ERROR',422);const x=await prisma.budget.upsert({where:{userId_category_month_year:{userId:u.id,category:p.data.category,month:p.data.month,year:p.data.year}},update:{limit:p.data.limit},create:{userId:u.id,...p.data}});return ok(await enrich(u.id,x),201)})}

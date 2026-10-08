@@ -1,0 +1,1 @@
+export {GET} from '@/app/api/dashboard/cash-flow/route'

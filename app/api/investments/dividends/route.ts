@@ -1,0 +1,7 @@
+import { z } from 'zod'
+import { prisma } from '@/lib/server/prisma'
+import { body,fail,ok } from '@/lib/server/http'
+import { withUser } from '@/lib/server/route'
+const s=z.object({assetId:z.string(),quantity:z.coerce.number().positive(),dividendPerShare:z.coerce.number().positive(),exDate:z.coerce.date(),paymentDate:z.coerce.date()})
+export async function GET(){return withUser(async u=>{const rows=await prisma.dividend.findMany({where:{userId:u.id},include:{asset:true},orderBy:{paymentDate:'desc'}});const now=new Date(),year=now.getFullYear(),month=now.getMonth();return ok({items:rows,totalDividends:rows.reduce((a,x)=>a+Number(x.totalAmount),0),thisYear:rows.filter(x=>x.paymentDate.getFullYear()===year).reduce((a,x)=>a+Number(x.totalAmount),0),thisMonth:rows.filter(x=>x.paymentDate.getFullYear()===year&&x.paymentDate.getMonth()===month).reduce((a,x)=>a+Number(x.totalAmount),0),upcoming:rows.filter(x=>x.paymentDate>now)})})}
+export async function POST(req:Request){return withUser(async u=>{const p=s.safeParse(await body(req));if(!p.success)return fail('Invalid dividend','VALIDATION_ERROR',422);if(!await prisma.asset.findUnique({where:{id:p.data.assetId}}))return fail('Asset not found','ASSET_NOT_FOUND',404);return ok(await prisma.dividend.create({data:{userId:u.id,...p.data,totalAmount:p.data.quantity*p.data.dividendPerShare},include:{asset:true}}),201)})}

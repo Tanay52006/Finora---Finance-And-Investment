@@ -1,0 +1,2 @@
+import { prisma } from '@/lib/server/prisma';import { ok } from '@/lib/server/http';import { withUser } from '@/lib/server/route'
+export async function GET(){return withUser(async u=>{const rows=await prisma.transaction.findMany({where:{userId:u.id}});const i=rows.filter(x=>x.type==='INCOME').reduce((a,x)=>a+Number(x.amount),0),e=rows.filter(x=>x.type==='EXPENSE').reduce((a,x)=>a+Number(x.amount),0);return ok({income:i,expenses:e,savings:i-e,savingsRate:i?(i-e)/i*100:0})})}

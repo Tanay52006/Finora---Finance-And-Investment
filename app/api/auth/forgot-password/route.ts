@@ -1,0 +1,2 @@
+import { body,ok } from '@/lib/server/http'
+export async function POST(req:Request){await body(req);return ok({message:'If the account exists, password reset instructions would be sent. Configure an email provider to enable delivery.'})}

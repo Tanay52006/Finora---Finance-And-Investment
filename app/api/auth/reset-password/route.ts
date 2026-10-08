@@ -1,0 +1,2 @@
+import { body,fail,ok } from '@/lib/server/http'
+export async function POST(req:Request){const b=await body(req);if(!b.token||!b.password)return fail('Token and password are required','VALIDATION_ERROR',422);return ok({message:'Password reset flow placeholder: connect a mail provider and signed reset-token store for production delivery.'})}

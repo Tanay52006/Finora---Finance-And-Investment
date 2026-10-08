@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: finora-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: finora
+      POSTGRES_PASSWORD: finora
+      POSTGRES_DB: finora
+    ports:
+      - "5432:5432"
+    volumes:
+      - finora_pgdata:/var/lib/postgresql/data
+volumes:
+  finora_pgdata:

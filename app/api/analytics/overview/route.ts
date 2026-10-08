@@ -1,0 +1,4 @@
+import { prisma } from '@/lib/server/prisma'
+import { ok } from '@/lib/server/http'
+import { withUser } from '@/lib/server/route'
+export async function GET(){return withUser(async u=>{const [tx,goals,hs]=await prisma.$transaction([prisma.transaction.findMany({where:{userId:u.id}}),prisma.goal.findMany({where:{userId:u.id}}),prisma.holding.findMany({where:{userId:u.id}})]);const income=tx.filter(x=>x.type==='INCOME').reduce((a,x)=>a+Number(x.amount),0),expenses=tx.filter(x=>x.type==='EXPENSE').reduce((a,x)=>a+Number(x.amount),0),portfolio=hs.reduce((a,h)=>a+Number(h.quantity)*Number(h.currentPrice),0);return ok({income,expenses,savings:income-expenses,portfolio,goalProgress:goals.reduce((a,g)=>a+(Number(g.currentAmount)/Number(g.targetAmount)*100),0)/(goals.length||1)})})}

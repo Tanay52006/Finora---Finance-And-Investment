@@ -1,0 +1,9 @@
+import { z } from 'zod'
+import { prisma } from '@/lib/server/prisma'
+import { body,fail,ok } from '@/lib/server/http'
+import { withUser } from '@/lib/server/route'
+const s=z.object({category:z.string().min(1).optional(),limit:z.coerce.number().positive().optional(),month:z.coerce.number().int().min(1).max(12).optional(),year:z.coerce.number().int().min(2020).max(2100).optional()})
+async function enrich(userId:string,b:any){const spent=await prisma.transaction.aggregate({where:{userId,type:'EXPENSE',category:b.category,date:{gte:new Date(b.year,b.month-1,1),lt:new Date(b.year,b.month,1)}},_sum:{amount:true}});const x=Number(spent._sum.amount||0),lim=Number(b.limit),pct=lim?x/lim*100:0;return {...b,spent:x,remaining:Math.max(0,lim-x),percentageUsed:pct,status:pct>=100?'OVER_BUDGET':pct>=80?'NEAR_LIMIT':'ON_TRACK'}}
+export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){return withUser(async u=>{const {id}=await params;const b=await prisma.budget.findFirst({where:{id,userId:u.id}});return b?ok(await enrich(u.id,b)):fail('Budget not found','BUDGET_NOT_FOUND',404)})}
+export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){return withUser(async u=>{const {id}=await params;const b=await prisma.budget.findFirst({where:{id,userId:u.id}});if(!b)return fail('Budget not found','BUDGET_NOT_FOUND',404);const p=s.safeParse(await body(req));if(!p.success)return fail('Invalid budget','VALIDATION_ERROR',422);const x=await prisma.budget.update({where:{id},data:p.data});return ok(await enrich(u.id,x))})}
+export async function DELETE(_:Request,{params}:{params:Promise<{id:string}>}){return withUser(async u=>{const {id}=await params;const b=await prisma.budget.findFirst({where:{id,userId:u.id}});if(!b)return fail('Budget not found','BUDGET_NOT_FOUND',404);await prisma.budget.delete({where:{id}});return ok({deleted:true})})}

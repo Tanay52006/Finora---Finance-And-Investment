@@ -1,0 +1,3 @@
+import { prisma } from '@/lib/server/prisma'
+import { ok } from '@/lib/server/http'
+export async function GET(req:Request){const u=new URL(req.url),q=(u.searchParams.get('q')||'').trim();const where:any={type:'STOCK',isActive:true};if(q)where.OR=[{symbol:{contains:q,mode:'insensitive'}},{name:{contains:q,mode:'insensitive'}},{category:{contains:q,mode:'insensitive'}}];return ok(await prisma.asset.findMany({where,orderBy:{marketCap:'desc'}}))}

@@ -1,0 +1,4 @@
+import { prisma } from '@/lib/server/prisma'
+import { ok } from '@/lib/server/http'
+import { withUser } from '@/lib/server/route'
+export async function GET(req:Request){return withUser(async u=>{const period=(new URL(req.url).searchParams.get('period')||'1Y').toUpperCase();const map:any={ '1D':1,'1W':7,'1M':30,'3M':90,'6M':180,'1Y':365,'3Y':1095,'5Y':1825,'ALL':10000};const days=map[period]||365;const since=new Date(Date.now()-days*86400000);let rows=await prisma.portfolioSnapshot.findMany({where:{userId:u.id,date:{gte:since}},orderBy:{date:'asc'}});if(!rows.length)rows=await prisma.portfolioSnapshot.findMany({where:{userId:u.id},orderBy:{date:'asc'}});return ok(rows.map(r=>({date:r.date,value:Number(r.value),invested:Number(r.invested)})))})}

@@ -1,0 +1,4 @@
+import { prisma } from '@/lib/server/prisma'
+import { ok } from '@/lib/server/http'
+import { withUser } from '@/lib/server/route'
+export async function GET(){return withUser(async u=>{const hs=await prisma.holding.findMany({where:{userId:u.id},include:{asset:true}});const map=new Map<string,{amount:number,profitLoss:number}>();for(const h of hs){const k=h.asset.type;const amount=Number(h.quantity)*Number(h.currentPrice),pl=Number(h.quantity)*(Number(h.currentPrice)-Number(h.averageBuyPrice));const x=map.get(k)||{amount:0,profitLoss:0};x.amount+=amount;x.profitLoss+=pl;map.set(k,x)}const total=[...map.values()].reduce((a,b)=>a+b.amount,0);return ok([...map.entries()].map(([type,x])=>({type,...x,percentage:total?x.amount/total*100:0})))})}

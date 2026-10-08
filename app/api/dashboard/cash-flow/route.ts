@@ -1,0 +1,4 @@
+import { prisma } from '@/lib/server/prisma'
+import { ok } from '@/lib/server/http'
+import { withUser } from '@/lib/server/route'
+export async function GET(){return withUser(async u=>{const rows=await prisma.transaction.findMany({where:{userId:u.id},select:{type:true,amount:true,date:true}});const map=new Map<string,{income:number,expenses:number}>();for(const r of rows){const k=r.date.toISOString().slice(0,7);const x=map.get(k)||{income:0,expenses:0};if(r.type==='INCOME')x.income+=Number(r.amount);else x.expenses+=Number(r.amount);map.set(k,x)}return ok(Array.from(map.entries()).sort().map(([month,x])=>({...x,month,savings:x.income-x.expenses})))})}

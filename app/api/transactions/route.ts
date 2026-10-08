@@ -1,0 +1,12 @@
+import { z } from 'zod'
+import { prisma } from '@/lib/server/prisma'
+import { body,fail,ok } from '@/lib/server/http'
+import { withUser } from '@/lib/server/route'
+const createSchema=z.object({type:z.enum(['INCOME','EXPENSE']),description:z.string().min(1).max(200),amount:z.coerce.number().positive(),category:z.string().min(1).max(80),date:z.coerce.date(),accountId:z.string().optional(),notes:z.string().max(500).optional()})
+function q(req:Request){const u=new URL(req.url);return {search:u.searchParams.get('search')||'',category:u.searchParams.get('category')||'',type:u.searchParams.get('type')||'',from:u.searchParams.get('from'),to:u.searchParams.get('to'),page:Math.max(1,Number(u.searchParams.get('page')||1)),limit:Math.min(100,Math.max(1,Number(u.searchParams.get('limit')||50))),sort:u.searchParams.get('sort')==='asc'?'asc':'desc'}}
+export async function GET(req:Request){return withUser(async u=>{const x=q(req);const where:any={userId:u.id};if(x.search)where.OR=[{description:{contains:x.search,mode:'insensitive'}},{category:{contains:x.search,mode:'insensitive'}}];if(x.category)where.category=x.category;if(x.type)where.type=x.type;if(x.from||x.to)where.date={...(x.from?{gte:new Date(x.from)}:{}),...(x.to?{lte:new Date(x.to)}:{})};const [items,total]=await prisma.$transaction([prisma.transaction.findMany({where,orderBy:{date:x.sort},skip:(x.page-1)*x.limit,take:x.limit}),prisma.transaction.count({where})]);return ok({items,total,page:x.page,limit:x.limit,totalPages:Math.ceil(total/x.limit)})})}
+export async function POST(req:Request){return withUser(async u=>{const p=createSchema.safeParse(await body(req));if(!p.success)return fail('Invalid transaction','VALIDATION_ERROR',422);const d=p.data;if(d.accountId){const a=await prisma.financialAccount.findFirst({where:{id:d.accountId,userId:u.id}});if(!a)return fail('Account not found','ACCOUNT_NOT_FOUND',404)}const tx=await prisma.$transaction(async db=>{
+ const created=await db.transaction.create({data:{...d,userId:u.id}})
+ if(d.accountId){const delta=d.type==='INCOME'?d.amount:-d.amount;await db.financialAccount.update({where:{id:d.accountId},data:{balance:{increment:delta}}})}
+ return created
+});return ok(tx,201)})}
